@@ -1,8 +1,4 @@
 #pragma once
-#define PROTOBUF_ALLOW_PACKED_REPEATED_FIELD_COPY 1
-#define PROTOBUF_NO_ARENA_REQUIRED 1
-#define PROTOBUF_DONT_USE_ARENA 1
-#define PROTOBUF_DISABLE_ARENA_ALWAYS 1
 #include "global.h"
 #include "socket.h"
 #include "buffer.h"
