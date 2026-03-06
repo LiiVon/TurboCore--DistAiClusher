@@ -1,19 +1,9 @@
 #pragma once
-#include "global.h"
-#include "address.h"
-#include "socket_utils.h"
 
-#ifdef _WIN32
-#include <winsock2.h>
-#include <ws2tcpip.h>
-#undef ERROR
-using SocketType = SOCKET;
-#else
-#include <netinet/in.h>
-#include <sys/socket.h>
-using SocketType = int;
-#define INVALID_SOCKET (-1)
-#endif
+#include "global.h"
+
+#include "address.h"
+
 
 namespace TcFrame
 {
@@ -53,6 +43,10 @@ namespace TcFrame
         SocketType GetFd() const;		// 获取原生socket句柄
         void Close();			// 主动关闭socket
         bool IsValid() const;   // 检查socket是否有效
+
+        
+        Address GetLocalAddress() const;
+        Address GetPeerAddress() const;
 
     private:
         SocketType m_sockfd = INVALID_SOCKET_VALUE; // 原生socket句柄
