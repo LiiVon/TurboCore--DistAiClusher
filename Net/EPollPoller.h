@@ -1,11 +1,8 @@
 #pragma once
 #ifdef __linux__
 #include "poller.h"
-
 #include <sys/epoll.h>
-
 #include <vector>
-
 
 
 namespace TcFrame
@@ -13,9 +10,6 @@ namespace TcFrame
     class EventLoop;
     class Channel;
 
-    /*
-    @brief: Linux平台epoll实现的Poller，大连接优化版，O(1)查找Channel
-    */
     class EpollPoller : public Poller
     {
     public:
@@ -37,7 +31,7 @@ namespace TcFrame
         EventLoop* m_ownerLoop;
         int m_epoll_fd; // epoll实例的fd
         std::vector<epoll_event> m_events; // epoll等待事件返回的缓冲区
-        std::unordered_map<SocketType, Channel*> m_fd_to_channel; // 大连接优化：fd -> Channel*，O(1)查找
+        std::unordered_map<SocketType, Channel*> m_fd_to_channel;
     };
 }
 #endif // __linux__
