@@ -1,0 +1,8 @@
+Channel类创建完后，它能直接管理socket了，而Poller类则是管理所有的Channel
+
+Poller类 是对 IO多路复用的 封装抽象类
+不同系统的底层IO多路是不一样的
+
+成员变量：
+1 EventLoop* m_ownerLoop
+2 
