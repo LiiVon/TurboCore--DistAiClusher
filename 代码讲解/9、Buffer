@@ -1,0 +1,31 @@
+问：为什么需要Buffer类？
+答：TCP是字节流协议，没有包的边界，发两次 ok，可能会一次性发出okok，也可能是oko k
+
+成员变量：
+读、写指针  以及  底层vector自动扩容的连续缓冲区
+
+| 已经读完的空闲空间 | 可读数据（待处理） | 可写空闲空间 |
+| <- m_read_idx  | m_read_idx ~ m_write_idx | m_write_idx -> |
+^ 开头
+0: 一开始，`m_read_idx = m_write_idx = 预留空间`，默认开头预留几字节
+
+成员函数
+1 基础信息查询  
+        可读数据长度，可写数据长度， 前置可预留空间大小
+        返回可读数据的起始地址
+2 读完 移动 读指针，标记处理完成
+        读取len字节，读取到某个位置，读取所有数据并清空缓冲区
+        把指定长度/所有可读数据  拷贝成string 返回
+3 协议查找，找包边界，解决拆包粘包
+4 写入数据 自动分配空间MakeSpace
+    Appender   内部会调用-->   EnsureWritablebytes  内部调用 --->  MakeSpace
+5 和socket读写绑定  分散读
+ReadFromFd  一次性把Socket内核缓冲区的数据全读出来，尽量减少系统调用次数
+    1 先创建栈上的临时缓冲区， Windows用WSABUF做分散读   WSABUF vec[2];
+    2 一个读Buffer本身可写空间，一个指向栈上的缓冲区给Buffer装不下的数据用
+    3 调用一次WSARecv，系统自动把数据按顺序填进两个缓冲区 
+    4 拿到了socket的全部数据 与 Buffer 比较大小，够就直接全部读完，直接移动写指针
+    5 不够 就先读满Buffer本身，然后指针指向末尾，Appender讲栈上的追加，会自动判断Buffer够不够并且自动扩容
+WriteToFd   因为读的时候本来就是连续的，所以没用分散写，
+    分散写得是  要写的数据分散在多个不连续的缓冲区内
+6 Appender 
