@@ -290,4 +290,109 @@ namespace TcFrame
 			m_cv.notify_one();
 		}
 	}
+
+	void Logger::Debug(const char* fmt, ...)
+	{
+		if (!m_is_running.load()) return;
+		if (LogLevel::DEBUG >= m_min_level)
+		{
+			char buf[4096]; // 栈上分配缓冲区，足够用
+			va_list args;
+			va_start(args, fmt);
+			vsnprintf(buf, sizeof(buf), fmt, args); // 用vsnprintf格式化，安全不越界
+			va_end(args);
+
+			LogEvent event{ LogLevel::DEBUG, std::string(buf), "", 0 };
+			BuildLogMeta(event);
+			{
+				std::lock_guard<std::mutex> lock(m_queue_mtx);
+				m_log_queue.push(event);
+			}
+			m_cv.notify_one();
+		}
+	}
+
+	void Logger::Info(const char* fmt, ...)
+	{
+		if (!m_is_running.load()) return;
+		if (LogLevel::INFO >= m_min_level)
+		{
+			char buf[4096];
+			va_list args;
+			va_start(args, fmt);
+			vsnprintf(buf, sizeof(buf), fmt, args);
+			va_end(args);
+
+			LogEvent event{ LogLevel::INFO, std::string(buf), "", 0 };
+			BuildLogMeta(event);
+			{
+				std::lock_guard<std::mutex> lock(m_queue_mtx);
+				m_log_queue.push(event);
+			}
+			m_cv.notify_one();
+		}
+	}
+
+	void Logger::Warn(const char* fmt, ...)
+	{
+		if (!m_is_running.load()) return;
+		if (LogLevel::WARN >= m_min_level)
+		{
+			char buf[4096];
+			va_list args;
+			va_start(args, fmt);
+			vsnprintf(buf, sizeof(buf), fmt, args);
+			va_end(args);
+
+			LogEvent event{ LogLevel::WARN, std::string(buf), "", 0 };
+			BuildLogMeta(event);
+			{
+				std::lock_guard<std::mutex> lock(m_queue_mtx);
+				m_log_queue.push(event);
+			}
+			m_cv.notify_one();
+		}
+	}
+
+	void Logger::Error(const char* fmt, ...)
+	{
+		if (!m_is_running.load()) return;
+		if (LogLevel::ERROR >= m_min_level)
+		{
+			char buf[4096];
+			va_list args;
+			va_start(args, fmt);
+			vsnprintf(buf, sizeof(buf), fmt, args);
+			va_end(args);
+
+			LogEvent event{ LogLevel::ERROR, std::string(buf), "", 0 };
+			BuildLogMeta(event);
+			{
+				std::lock_guard<std::mutex> lock(m_queue_mtx);
+				m_log_queue.push(event);
+			}
+			m_cv.notify_one();
+		}
+	}
+
+	void Logger::Fatal(const char* fmt, ...)
+	{
+		if (!m_is_running.load()) return;
+		if (LogLevel::FATAL >= m_min_level)
+		{
+			char buf[4096];
+			va_list args;
+			va_start(args, fmt);
+			vsnprintf(buf, sizeof(buf), fmt, args);
+			va_end(args);
+
+			LogEvent event{ LogLevel::FATAL, std::string(buf), "", 0 };
+			BuildLogMeta(event);
+			{
+				std::lock_guard<std::mutex> lock(m_queue_mtx);
+				m_log_queue.push(event);
+			}
+			m_cv.notify_one();
+		}
+	}
 }
