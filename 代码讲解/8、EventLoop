@@ -34,5 +34,34 @@ using Functor = std::function<void()>;
 4 RunInLoop & QueueInLoop
         让回调在Loop执行，如果在Loop了直接执行，如果不在Loop，则放入跨线程等待处
 5 Wakeup  跨线程唤醒阻塞在Poll的EventLoop
+          EventLoop调用Poller->poll() 等待IO事件，线程休眠，
+          此时另外线程投递pending任务，所以需要唤醒
+问：如何实现唤醒的？ CreateWakeupPair
+答：OS创建一对互相连接的本地socket，readfd和writefd，两个fd是互通的
+    读端wakeupfd注册给std::unique_ptr<Channel> m_wakeupChannel;，开始读监听
+    别的线程要唤醒，只需要往写段wakeupwrite写入，然后读端就非空可读，被监听到
+问：为什么是8字节 而不是1字节？
+答：1字节太小，第一次写唤醒成功，还没读走这1字节的时候，另外一个线程又唤醒又写了1字节
+    poll会连续触发读事件，效率低了
+  
+6 CreateWakeupPair  创建读写对应socket
+          1 创建监听socket  2 绑定本地回环地址，端口设为0
+          3 开始监听  4 拿到系统分配的实际端口 5 创建写端socket，连接到监听的本地端口
+          6 accept拿到读端socket
+7 HandleWakeupRead  唤醒事件的处理函数
+      把读端的数据全部读干净，让读端重新变成“不可读”，等待下一次唤醒，不能残留数据。
+
+8 DoPendingFunctors  处理跨线程投递任务的核心方法
+          1 先栈上空vector，等下和待处理跨线程任务vector  m_pendingFunctors  交换
+          2 标记正在执行pending
+          3 缩小锁范围，加锁进行交换vector swap只交换指针O(1) 
+          4 换完释放锁，减小锁竞争，遍历任务vector 执行回调。 最后再次标记pending任务
+
+9 RunAfter  将任务按过期时间插入进小顶堆，每次Loop循环处理完IO和跨线程后
+            调用ProcessDelayedTasks，检查事件过期，堆顶过期就执行，没过期就停止
+10 ProcessDelayedTasks  执行定时任务的逻辑
+            加锁，判断是否过期，过期执行，没过期弹出
+问：怎么理解这里的过期？
+答：RunAfter是在多少s之后执行预定的回调函数，过期就是超过了这个事件可以执行，反之还没到时候，不执行
 
     
