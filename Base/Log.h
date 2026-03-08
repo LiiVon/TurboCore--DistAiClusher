@@ -93,6 +93,13 @@ namespace TcFrame
 		virtual void Warn(const std::string& content) = 0;
 		virtual void Error(const std::string& content) = 0;
 		virtual void Fatal(const std::string& content) = 0;
+
+		// printf风格重载声明
+		virtual void Debug(const char* fmt, ...) = 0;
+		virtual void Info(const char* fmt, ...) = 0;
+		virtual void Warn(const char* fmt, ...) = 0;
+		virtual void Error(const char* fmt, ...) = 0;
+		virtual void Fatal(const char* fmt, ...) = 0;
 	};
 
 	// 日志管理器：单例，全局唯一
@@ -117,6 +124,13 @@ namespace TcFrame
 		void Error(const std::string& content) override;
 		void Fatal(const std::string& content) override;
 
+		// printf风格重载声明
+		void Debug(const char* fmt, ...) override;
+		void Info(const char* fmt, ...) override;
+		void Warn(const char* fmt, ...) override;
+		void Error(const char* fmt, ...) override;
+		void Fatal(const char* fmt, ...) override;
+
 	private:
 		Logger();
 		~Logger();
@@ -138,15 +152,12 @@ namespace TcFrame
 		std::thread m_log_thread;                      // 异步写线程
 		std::atomic<bool> m_is_running;                // 原子运行标志
 	};
-
-	// 定义常用的日志宏，简化日志调用
-#define LOG_DEBUG(content) Logger::Instance().Debug(content)
-
-#define LOG_INFO(content)  Logger::Instance().Info(content)
-
-#define LOG_WARN(content)  Logger::Instance().Warn(content)
-
-#define LOG_ERROR(content) Logger::Instance().Error(content)
-
-#define LOG_FATAL(content) Logger::Instance().Fatal(content)
 }
+
+// 定义常用的日志宏，简化日志调用
+
+#define LOG_DEBUG(content) Logger::Instance().Debug(content)
+#define LOG_INFO(content)  Logger::Instance().Info(content)
+#define LOG_WARN(content)  Logger::Instance().Warn(content)
+#define LOG_ERROR(content) Logger::Instance().Error(content)
+#define LOG_FATAL(content) Logger::Instance().Fatal(content)
