@@ -1,0 +1,59 @@
+threadpool 线程池
+
+为什么需要？
+避免反复创建销毁线程的 操作，复用线程处理异步任务
+
+成员变量
+1 std::vector<std::thread> m_workers  所有活跃工作线程的对象  
+      vector ？ vector的访问是O(1)，但是插入删除都是O(n)
+                线程不会频繁的随机插入删除，只有扩容缩容的时候会，vector高效
+      同时方便管理线程的生命周期
+
+2 std::queue<std::function<void()>> m_tasks  等待处理的任务队列
+3 mutable std::mutex m_queue_mutex          保护任务队列的互斥锁
+      为什么要锁？  m_tasks和m_workers都是多个线程共享的
+
+4. std::condition_variable m_cv;      条件变量，唤醒空闲线程
+5. std::atomic<bool> m_is_running;     线程池运行标志
+       atomic？    该标志将被多个线程频繁的读取，原子变量的读写是无锁的，性能好，且变更后，所有线程能立即发现
+       无锁？       
+6. std::atomic<size_t> m_target_thread_num; 目标线程数（动态调整用）
+
+成员函数
+1 template<typename Func, typename... Args>
+  auto Commit(Func&& func, Args&&... args)
+        -> std::future<typename std::invoke_result_t<Func, Args...>>;
+      可变参数  万能引用+完美转发 后置类型返回+自动推导返回值
+      invoke_result_t？  自动推导“Func函数用Args参数调用之后，返回值是什么类型”
+      std::future    ？  先接住存贮 异步任务的执行结果 ， 用户后续需要该异步结果的时候从 future中获取
+   实现：
+      1、线程池停止检查，包装任务，给用户返回future，用于获取结果
+      2、最小化锁作用域，加锁，入队任务，又原先是空队列线程是阻塞的，所以入队后出了}作用域锁解开，就唤醒原先阻塞的线程
+      3、最后定期清理退出的线程，返回future给用户
+      std::packaged_task？ 包装可调用对象，把执行结果异步传给std::future 可以说两者紧密结合
+                           包装后 task->get_future 返回一个future给用户，用户再用future.get() 获取结果
+                  
+      std::forward？    完美转发函数，保留函数的左值/右值属性，避免不必要拷贝。
+      std::bind ？      将 func(args...)变成了无参的()可调用对象  正好给packaged_task包装
+      std::shared_ptr包装packaged_task？ 
+                        std::packaged_task是不可拷贝的
+                        而我们要把它放进lambda，再存进std::function<void()>里，std::function要求可调用对象必须可拷贝。
+
+
+2 Shutdown  安全关闭线程池，不丢已经提交的任务，不泄漏资源，不崩溃，所有已经提交的任务都执行完再退出
+            标记，唤醒，join等待，加锁清空处理队列 （加锁 处理共享队列的统一操作）
+
+3、4 get、Is  直接返回相关变量
+5 Resize  动态调整线程池大小，调整完后 清理退出的线程
+6 CleanupExitedThreads   清理已经退出的线程
+        加锁、遍历 移除可以join的线程
+7  WorkerLoop  工作线程的核心循环  等任务 → 拿任务 → 执行任务 → 回去等任务，循环往复
+        优雅关闭核心： 循环的时候 两个条件 线程池运行 + 任务队列还有任务
+        unique_ptr ?  可以手动释放更加灵活，lock_guard 不可以
+        m_cv.wait(lock, 谓词)   只有谓词返回true才会醒来，否则继续等，
+        依旧是 加锁，唤醒，取出任务，立即释放锁
+
+
+ 
+    
+      
