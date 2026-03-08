@@ -1,8 +1,32 @@
 Channel类创建完后，它能直接管理socket了，而Poller类则是管理所有的Channel
 
 Poller类 是对 IO多路复用的 封装抽象类
-不同系统的底层IO多路是不一样的
+不同系统的底层IO多路是不一样的，进行封装，隐藏细节，方便上层EventLoop使用
+
+主要讲一下WSPollPoller
 
 成员变量：
-1 EventLoop* m_ownerLoop
-2 
+1 EventLoop* m_ownerLoop  存当前Poller所属的EventLoop指针，知道自己属于哪个事件循环。
+2 std::vector<WSAPOLLFD> m_pollfds;  要监控的WSAPOLLFD都存在这个vector
+    WSAPOLLFD？  是WASPoll要求的 结构体
+      
+问：什么是WSAPoll 和 EPoll
+答：IO复用机制，都是同时监控多个socket，有事件就告诉你哪个socket有事件
+
+3 std::vector<Channel*> m_channels;   Channel列表，和m_pollfds一一对应，索引直接找到Channel
+    m_pollfds 只返回fd和就绪事件，我们通过fd获取对应的Channel* 才能处理事件
+问：为什么会对齐？
+答：在添加、删除的时候，两个vector同时操作即可
+
+问：为什么存指针？
+答：Channel的生命周期由上层管理，Poller只需要用它，不拥有它
+    智能指针会增大开销，目前也不需要智能指针
+
+4 std::unordered_map<SocketType, size_t> m_fd_to_idx;  建立socket fd → 对应在vector里的下标的映射
+      map？   原生的Poll是要求连续的，查找是O(n)的，用map更高效O(1)
+
+成员函数：
+1 TransRevents  把Windows WSAPoll返回的原生事件位，转换成我们Channel定义的统一事件位掩码
+                这样Channel才能识别
+
+
