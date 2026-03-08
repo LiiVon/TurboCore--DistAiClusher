@@ -14,7 +14,7 @@ namespace TcFrame
     EpollPoller::EpollPoller(EventLoop* loop)
         : m_ownerLoop(loop)
     {
-        // 创建epoll实例，尺寸传一个大于0的数就行，内核现在忽略这个尺寸
+    
         m_epoll_fd = epoll_create1(EPOLL_CLOEXEC);
         if (m_epoll_fd < 0)
         {
@@ -87,7 +87,6 @@ namespace TcFrame
             m_events.resize(m_events.size() * 2);
         }
 
-        // 遍历就绪事件，O(1)找到Channel，填充revents，加入active_channels
         for (int i = 0; i < num_events; ++i)
         {
             SocketType fd = (SocketType)m_events[i].data.fd;
