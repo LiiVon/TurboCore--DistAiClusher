@@ -1,54 +1,47 @@
 #pragma once
 
 #include "global.h"
-
 #include "address.h"
-
 
 namespace TcFrame
 {
-    // TCP socket封装类，RAII管理生命周期，跨平台封装所有基础socket操作
-    class Socket
-    {
-    public:
-        // 工厂方法：创建非阻塞TCP socket
-        static Socket CreateNonBlocking();
+	// TCP socket封装类，RAII管理生命周期，跨平台封装所有基础socket操作
+	class Socket
+	{
+	public:
+		// 工厂方法：创建非阻塞TCP socket
+		static Socket CreateNonBlocking();
 
-        // 绑定已有socket句柄（比如accept返回的新连接）
-        explicit Socket(SocketType sockfd);
-        // 默认构造：自动创建一个TCP socket，默认开启地址复用
-        Socket();
-        // 析构：自动关闭socket，释放资源
-        ~Socket();
+		// 绑定已有socket句柄（比如accept返回的新连接）
+		explicit Socket(SocketType sockfd);
+		Socket();
+		~Socket();
 
-        // 禁止拷贝，socket资源不允许拷贝
-        Socket(const Socket&) = delete;
-        Socket& operator=(const Socket&) = delete;
-        // 允许移动，转移socket所有权，方便放入容器
-        Socket(Socket&& other) noexcept;
-        Socket& operator=(Socket&& other) noexcept;
+		Socket(const Socket&) = delete;
+		Socket& operator=(const Socket&) = delete;
+		Socket(Socket&& other) noexcept;
+		Socket& operator=(Socket&& other) noexcept;
 
-        // 核心业务接口
-        bool Bind(const Address& addr);    // 绑定地址（服务端监听用）
-        bool Listen(int backlog = 1024);  // 开始监听
-        std::unique_ptr<Socket> Accept(Address& peer_addr);  // 接受新连接，返回新socket
-        bool Connect(const Address& server_addr);  // 主动连接服务器（客户端用）
+		// 核心业务接口
+		bool Bind(const Address& addr);    // 绑定地址（服务端监听用）
+		bool Listen(int backlog = 1024);  // 开始监听
+		std::unique_ptr<Socket> Accept(Address& peer_addr);  // 接受新连接，返回新socket
+		bool Connect(const Address& server_addr);  // 主动连接服务器（客户端用）
 
-        // 选项设置
-        void SetReuseAddr(bool enable = true);
-        void SetReusePort(bool enable = true);
-        void SetNonBlocking(bool enable = true);
+		// 选项设置
+		void SetReuseAddr(bool enable = true);
+		void SetReusePort(bool enable = true);
+		void SetNonBlocking(bool enable = true);
 
-        // 工具接口
-        SocketType GetFd() const;		// 获取原生socket句柄
-        void Close();			// 主动关闭socket
-        bool IsValid() const;   // 检查socket是否有效
+		// 工具接口
+		SocketType GetFd() const;		// 获取原生socket句柄
+		void Close();			// 主动关闭socket
+		bool IsValid() const;   // 检查socket是否有效
 
-        
-        Address GetLocalAddress() const;
-        Address GetPeerAddress() const;
+		Address GetLocalAddress() const;
+		Address GetPeerAddress() const;
 
-    private:
-        SocketType m_sockfd = INVALID_SOCKET_VALUE; // 原生socket句柄
-    };
+	private:
+		SocketType m_sockfd = INVALID_SOCKET_VALUE; // 原生socket句柄
+	};
 }
