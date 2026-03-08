@@ -17,7 +17,7 @@ namespace TcFrame
 	{
 	public:
 		Address();
-		Address(const std::string& ip = "0.0.0.0", uint16_t port);
+		Address(const std::string& ip , uint16_t port);
 		~Address() = default;
 
 		// 获取系统调用需要的sockaddr指针
