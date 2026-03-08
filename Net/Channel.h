@@ -16,11 +16,10 @@ namespace TcFrame
 		static const int kReadEvent;    // 关心读事件，对应POLLIN
 		static const int kWriteEvent;   // 关心写事件，对应POLLOUT
 
-		// 构造：每个Channel唯一绑定一个fd和所属EventLoop，explicit禁止隐式转换
+		// 每个Channel唯一绑定一个fd和所属EventLoop，explicit禁止隐式转换
 		explicit Channel(EventLoop* loop, SocketType fd);
 		~Channel();
 
-		// 禁止拷贝，每个Channel唯一对应一个fd，不允许拷贝
 		Channel(const Channel&) = delete;
 		Channel& operator=(const Channel&) = delete;
 
@@ -50,7 +49,7 @@ namespace TcFrame
 		SocketType GetFd() const;          // 获取绑定的socket fd
 		EventLoop* GetOwnerLoop() const;   // 获取所属的EventLoop
 
-		// 标记是否已经添加到Poller，避免重复添加
+		// 标记是否已经添加到Poller
 		void SetAdded(bool added);
 		bool IsAdded() const;
 
