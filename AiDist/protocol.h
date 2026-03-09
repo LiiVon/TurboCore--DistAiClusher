@@ -5,6 +5,8 @@
 #include <vector>
 #include <cstdint>
 #include <stdexcept>
+#include "logger.h"
+using namespace TcFrame;
 
 namespace AiSchedule {
 	// ==================== 基础常量定义 ====================
@@ -120,11 +122,20 @@ namespace AiSchedule {
 		REGISTER_WORKER,   // Worker向注册中心发起注册
 		REGISTER_RESP,     // 注册中心返回注册结果
 		HEARTBEAT,         // Worker心跳上报
+		HEARTBEAT_RESP,    // 注册中心心跳响应
 		SUBMIT_TASK,       // 用户向调度中心提交任务
+		SUBMIT_TASK_RESP,   // 调度中心返回提交任务结果
 		TASK_DISPATCH,     // 调度中心分发切片给Worker
 		TASK_RESULT_REPORT,// Worker上报切片结果
 		TASK_QUERY,        // 用户查询任务进度
-		WORKER_REMOVE     // Worker主动请求下线
+		TASK_QUERY_RESP,   // 调度中心返回任务查询结果
+		WORKER_REMOVE,     // Worker主动请求下线
+		WORKER_OFFLINE,    // 注册中心主动通知所有节点/调度中心，该节点已离线
+		NODE_QUERY,       // 调度中心查询支持某模型的在线节点
+		NODE_QUERY_RESP,  // 注册中心返回节点列表
+		JOB_LIST_REQ,      // 网关请求获取所有任务列表（给Qt界面用）
+		JOB_LIST_RESP,     // 调度中心返回所有任务列表给网关
+		ERROR_RESP         // 通用错误响应
 	};
 
 	struct BasePacket {
@@ -177,13 +188,16 @@ namespace AiSchedule {
 	};
 
 	// 2. 注册响应：注册中心 → Worker
-	struct WorkerRegisterResp {
+	struct WorkerRegisterResp
+	{
 		bool success;
 		std::string node_id;           // 注册中心分配的全局唯一节点ID
 		std::string message;            // 结果描述：失败原因/成功提示
 
-		nlohmann::json to_json() const {
-			return {
+		nlohmann::json to_json() const
+		{
+			return
+			{
 				{"success", success},
 				{"node_id", node_id},
 				{"message", message}
@@ -199,13 +213,16 @@ namespace AiSchedule {
 	};
 
 	// 3. 心跳包：Worker → 注册中心
-	struct Heartbeat {
+	struct Heartbeat
+	{
 		std::string node_id;
 		int32_t available_memory_mb;   // 当前节点可用GPU显存
 		std::vector<std::string> online_models; // 当前在线可调度模型
 
-		nlohmann::json to_json() const {
-			return {
+		nlohmann::json to_json() const
+		{
+			return
+			{
 				{"node_id", node_id},
 				{"available_memory_mb", available_memory_mb},
 				{"online_models", online_models}
@@ -220,7 +237,24 @@ namespace AiSchedule {
 		}
 	};
 
-	// 4. 提交任务请求：用户 → 调度中心
+	struct HeartbeatResp
+	{
+		bool ack;          // true表示注册中心确认在线，false表示已被剔除
+		std::string message;
+
+		nlohmann::json to_json() const
+		{
+			return { {"ack", ack}, {"message", message} };
+		}
+		static HeartbeatResp from_json(const nlohmann::json& j) {
+			HeartbeatResp resp;
+			resp.ack = j.at("ack").get<bool>();
+			resp.message = j.at("message").get<std::string>();
+			return resp;
+		}
+	};
+
+	// 提交任务请求：用户 → 调度中心
 	struct SubmitTaskReq {
 		std::string model_name;         // 需要推理的目标模型
 		int32_t slice_size;             // 自定义切片大小，0表示自动切片
@@ -242,7 +276,7 @@ namespace AiSchedule {
 		}
 	};
 
-	// 5. 提交任务响应：调度中心 → 用户
+	//  提交任务响应：调度中心 → 用户
 	struct SubmitTaskResp {
 		bool success;
 		std::string task_id;            // 调度中心分配的任务ID
@@ -264,7 +298,7 @@ namespace AiSchedule {
 		}
 	};
 
-	// 6. 任务分发包：调度中心 → Worker
+	// 任务分发包：调度中心 → Worker
 	struct TaskDispatch {
 		std::string task_id;           // 所属总任务ID
 		int32_t slice_id;               // 切片ID，结果汇总排序用
@@ -297,7 +331,7 @@ namespace AiSchedule {
 		}
 	};
 
-	// 7. 切片结果上报：Worker → 调度中心
+	// 切片结果上报：Worker → 调度中心
 	struct TaskResultReport {
 		std::string task_id;
 		int32_t slice_id;
@@ -335,7 +369,7 @@ namespace AiSchedule {
 		}
 	};
 
-	// 8. 任务查询请求：用户 → 调度中心
+	//  任务查询请求：用户 → 调度中心
 	struct TaskQueryReq {
 		std::string task_id;
 
@@ -358,8 +392,9 @@ namespace AiSchedule {
 		FAILED = 4          // 执行失败
 	};
 
-	// 9. 任务查询响应：调度中心 → 用户
-	struct TaskQueryResp {
+	// .任务查询响应：调度中心 → 用户
+	struct TaskQueryResp
+	{
 		bool exists;
 		TaskStatus status;
 		int32_t total_slices;
@@ -368,8 +403,10 @@ namespace AiSchedule {
 		std::string result_file_url;
 		std::string message;
 
-		nlohmann::json to_json() const {
-			return {
+		nlohmann::json to_json() const
+		{
+			return
+			{
 				{"exists", exists},
 				{"status", (int)status},
 				{"total_slices", total_slices},
@@ -396,8 +433,12 @@ namespace AiSchedule {
 	{
 		std::string node_id;  // 要下线的节点ID
 
-		nlohmann::json to_json() const {
-			return { {"node_id", node_id} };
+		nlohmann::json to_json() const
+		{
+			return
+			{
+				{"node_id", node_id}
+			};
 		}
 		static WorkerRemoveReq from_json(const nlohmann::json& j) {
 			WorkerRemoveReq req;
@@ -406,20 +447,81 @@ namespace AiSchedule {
 		}
 	};
 
+	struct WorkerOfflineNotify
+	{
+		std::string node_id;     // 离线的节点ID
+		std::vector<std::string> running_tasks; // 该节点上正在跑的任务切片，调度中心用来重调度
+
+		nlohmann::json to_json() const
+		{
+			return
+			{
+				{"node_id", node_id},
+				{"running_tasks", running_tasks}
+			};
+		}
+		static WorkerOfflineNotify from_json(const nlohmann::json& j) {
+			WorkerOfflineNotify notify;
+			notify.node_id = j.at("node_id").get<std::string>();
+			notify.running_tasks = j.at("running_tasks").get<std::vector<std::string>>();
+			return notify;
+		}
+	};
+
+	struct NodeQueryReq
+	{
+		std::string model_name;
+
+		nlohmann::json to_json() const {
+			return { {"model_name", model_name} };
+		}
+		static NodeQueryReq from_json(const nlohmann::json& j) {
+			NodeQueryReq req;
+			req.model_name = j.at("model_name").get<std::string>();
+			return req;
+		}
+	};
+
+	struct ErrorResp
+	{
+		uint64_t req_seq;    // 对应请求的序列号，对端知道哪个请求错了
+		int32_t code;        // 错误码：比如1=非法请求，2=节点不存在，3=任务不存在
+		std::string message; // 错误信息
+
+		nlohmann::json to_json() const
+		{
+			return
+			{
+				{"req_seq", req_seq},
+				{"code", code},
+				{"message", message}
+			};
+		}
+		static ErrorResp from_json(const nlohmann::json& j) {
+			ErrorResp resp;
+			resp.req_seq = j.at("req_seq").get<uint64_t>();
+			resp.code = j.at("code").get<int32_t>();
+			resp.message = j.at("message").get<std::string>();
+			return resp;
+		}
+	};
+
 	// ==================== 最外层统一包：统一序列化入口 ====================
-	struct AiSchedulePacket {
+	struct AiSchedulePacket
+	{
 		TransportHeader trans_header;
 		BasePacket base_header;
 		nlohmann::json body;           // 业务body，根据type对应不同业务包
 
 		// 统一序列化：转为可发送的字节流，直接给TCP连接发送
-		void serialize(std::vector<char>& out_bytes) const {
+		void serialize(std::vector<char>& out_bytes) const
+		{
 			// 1. 序列化公共头+业务body为JSON字符串
 			nlohmann::json full_body = nlohmann::json::object();
 			full_body["base"] = base_header.to_json();
 			full_body["body"] = body;
 			std::string body_str = full_body.dump();
-
+			assert(!body_str.empty() && "serialize: body can't be empty after serialize");
 			// 2.  计算body的CRC32校验和
 			uint32_t checksum = crc32(0, reinterpret_cast<const uint8_t*>(body_str.data()), body_str.size());
 
@@ -437,19 +539,28 @@ namespace AiSchedule {
 		}
 
 		// 统一反序列化：从字节流解析出完整包，失败返回false表示非法包
-		static bool deserialize(const char* buf, size_t buf_len, AiSchedulePacket& out_packet) {
+		static bool deserialize(const char* buf, size_t buf_len, AiSchedulePacket& out_packet)
+		{
 			// 1. 先解析传输头
-			if (!TransportHeader::deserialize_from_bytes(buf, buf_len, out_packet.trans_header)) {
+			if (!TransportHeader::deserialize_from_bytes(buf, buf_len, out_packet.trans_header))
+			{
+				LOG_WARN("deserialize failed: invalid transport header, magic/version mismatch");
 				return false;
 			}
 			// 2. 校验buf长度是否足够
-			if (buf_len < TransportHeader::header_size() + out_packet.trans_header.body_len) {
+			if (buf_len < TransportHeader::header_size() + out_packet.trans_header.body_len)
+			{
+				LOG_WARN("deserialize failed: not enough data, need %zu, got %zu",
+					TransportHeader::header_size() + out_packet.trans_header.body_len, buf_len);
 				return false;
 			}
 			// 3. 校验CRC32，数据传输出错直接丢弃
 			const char* body_buf = buf + TransportHeader::header_size();
 			uint32_t actual_checksum = crc32(0, reinterpret_cast<const uint8_t*>(body_buf), out_packet.trans_header.body_len);
-			if (actual_checksum != out_packet.trans_header.checksum) {
+			if (actual_checksum != out_packet.trans_header.checksum)
+			{
+				LOG_ERROR("deserialize failed: CRC checksum mismatch, expect %u, got %u",
+					out_packet.trans_header.checksum, actual_checksum);
 				return false;
 			}
 			// 4. 解析JSON，捕获JSON异常，不崩溃
@@ -479,4 +590,4 @@ namespace AiSchedule {
 			return packet;
 		}
 	};
-} // namespace AiSchedule
+}
