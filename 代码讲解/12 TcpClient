@@ -1,0 +1,19 @@
+TcpClient绑定一个固定的EventLoop，所有操作都在Loop线程执行，
+主动connect到指定服务器地址，connect成功后创建TcpConnection，
+复用TcpConnection做所有IO管理
+
+成员变量：
+1 m_loop     绑定所属Reactor
+2 m_server_addr   保存要连接的服务器地址
+3 m_name      客户端名字
+4 m_socket     连接建立完成之前，临时持有socket fd
+    为什么指针？  connect完成后就把Socket转移给TcpConnection，所以用指针，生命周期分阶段管理
+5 m_connection    连接建立成功后，持有TcpConnection智能指针
+6 回调函数
+7 m_connecting  m_started  m_auto_reconnect  各种状态
+8 m_reconnect_delay_ms  重连延迟，默认3秒
+
+
+成员函数
+1 构造析构
+2 connect
