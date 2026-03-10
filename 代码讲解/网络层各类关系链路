@@ -1,0 +1,51 @@
+上层业务：Scheduler
+    │
+    ├─► TcpServer（被动服务端，管理所有accept连接）
+    │       │
+    │       └─► Acceptor（专门负责监听端口、accept新连接）
+    │               │
+    │               └─► Socket（监听fd的RAII封装）
+    │                       │
+    │                       └─► Address（封装监听IP+端口）
+    │
+    └─► TcpClient（主动客户端，发起连接）
+            │
+            └─► Socket（客户端连接fd的RAII封装）
+                    │
+                    └─► Address（封装远端服务器IP+端口）
+
+
+TcpServer 和 TcpClient 共同依赖 ↓
+┌───────────────────────────────────┐
+│  每建立一个新连接 → 创建 TcpConnection
+└───────────────────────────────────┘
+                │
+                ├─► Socket（连接fd的RAII封装）
+                │       └─► Address（对端地址）
+                ├─► Channel（把连接fd绑定到EventLoop，监听读写事件）
+                ├─► Buffer（读缓冲区：对端数据缓存；写缓冲区：待发数据缓存）
+                └─► EventLoop（所属Reactor循环，所有操作都在这里执行）
+
+
+所有上层共同依赖 ↓
+          EventLoop（Reactor核心，一个线程一个Loop）
+              │
+              ├─► 管理所有 Channel，分发IO事件到对应Channel
+              └─► Poller（IO多路复用抽象基类，统一接口）
+                      │
+                      ├─► EpollPoller（Linux平台epoll具体实现）
+                      └─► WsPollPoller（WebSocket IO轮询具体实现）
+
+
+最底层基础工具，所有上层都依赖 ↓
+          ┌─────────┐
+          │ Address  │ （IP+端口封装）
+          ├─────────┤
+          │SocketUtils│（错误处理、非阻塞设置、工具方法）
+          └─────────┘
+
+客户端发起连接 → 内核触发listenfd可读 → EventLoop检测到事件 → Acceptor回调 → accept拿到新fd → TcpServer创建TcpConnection → TcpConnection注册Channel到EventLoop → TcpServer保存连接 → 回调Scheduler
+    ↓
+客户端发请求数据 → 内核触发连接fd可读 → EventLoop检测到事件 → TcpConnection读回调 → 数据读到Buffer → 回调Scheduler → Scheduler拆包处理业务
+    ↓
+Scheduler回响应 → 任意线程调用TcpConnection::Send → Send抛任务到EventLoop → EventLoop执行SendInLoop → 数据写到Buffer → 开启写监听 → 内核触发可写 → TcpConnection写回调 → Buffer数据写到内核 → 写完关闭写监听 → 请求完成
